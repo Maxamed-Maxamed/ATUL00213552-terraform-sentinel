@@ -25,3 +25,5 @@ override.tf.json
 # Environment and editor files
 .env
 .vscode/
+# Sentinel local cache
+.sentinel/
