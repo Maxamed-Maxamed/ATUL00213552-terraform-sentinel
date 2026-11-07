@@ -1,0 +1,16 @@
+resource_changes = {
+	"aws_instance.compliant": {
+		"address": "aws_instance.compliant",
+		"mode":    "managed",
+		"type":    "aws_instance",
+		"name":    "compliant",
+		"change": {
+			"actions": ["create"],
+			"after": {
+				"metadata_options": {
+					"http_tokens": "required",
+				},
+			},
+		},
+	},
+}
