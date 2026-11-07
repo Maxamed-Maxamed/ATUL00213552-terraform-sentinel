@@ -1,0 +1,17 @@
+resource_changes = {
+	"aws_vpc_security_group_ingress_rule.non_compliant": {
+		"address": "aws_vpc_security_group_ingress_rule.non_compliant",
+		"mode":    "managed",
+		"type":    "aws_vpc_security_group_ingress_rule",
+		"name":    "non_compliant",
+		"change": {
+			"actions": ["create"],
+			"after": {
+				"ip_protocol": "tcp",
+				"from_port":   22,
+				"to_port":     22,
+				"cidr_ipv4":   "0.0.0.0/0",
+			},
+		},
+	},
+}

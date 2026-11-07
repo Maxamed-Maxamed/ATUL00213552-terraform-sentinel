@@ -1,0 +1,5 @@
+variables = {
+	"aws_region": {
+		"value": "eu-west-1",
+	},
+}

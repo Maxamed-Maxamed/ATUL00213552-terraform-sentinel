@@ -1,0 +1,19 @@
+providers = {
+	"aws": {
+		"provider_config_key": "aws",
+		"name":                "aws",
+		"full_name":           "registry.terraform.io/hashicorp/aws",
+		"alias":               "",
+		"module_address":      "",
+		"version_constraint":  "~> 6.0",
+	},
+}
+
+module_calls = {
+	"vpc": {
+		"name":               "vpc",
+		"module_address":     "",
+		"source":             "terraform-aws-modules/vpc/aws",
+		"version_constraint": "6.0.1",
+	},
+}

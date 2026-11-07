@@ -1,0 +1,19 @@
+providers = {
+	"aws": {
+		"provider_config_key": "aws",
+		"name":                "aws",
+		"full_name":           "registry.terraform.io/untrusted/aws",
+		"alias":               "",
+		"module_address":      "",
+		"version_constraint":  ">= 4.0",
+	},
+}
+
+module_calls = {
+	"vpc": {
+		"name":               "vpc",
+		"module_address":     "",
+		"source":             "untrusted-example/vpc/aws",
+		"version_constraint": "",
+	},
+}

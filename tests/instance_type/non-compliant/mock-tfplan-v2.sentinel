@@ -1,0 +1,14 @@
+resource_changes = {
+	"aws_instance.non_compliant": {
+		"address": "aws_instance.non_compliant",
+		"mode":    "managed",
+		"type":    "aws_instance",
+		"name":    "non_compliant",
+		"change": {
+			"actions": ["create"],
+			"after": {
+				"instance_type": "m5.large",
+			},
+		},
+	},
+}

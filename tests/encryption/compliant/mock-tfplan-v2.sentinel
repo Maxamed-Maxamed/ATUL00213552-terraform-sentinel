@@ -1,0 +1,14 @@
+resource_changes = {
+	"aws_ebs_volume.compliant": {
+		"address": "aws_ebs_volume.compliant",
+		"mode":    "managed",
+		"type":    "aws_ebs_volume",
+		"name":    "compliant",
+		"change": {
+			"actions": ["create"],
+			"after": {
+				"encrypted": true,
+			},
+		},
+	},
+}

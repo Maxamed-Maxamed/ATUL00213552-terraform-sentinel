@@ -1,0 +1,22 @@
+import "tfplan/v2" as tfplan
+
+# Find security group ingress rules being created or updated.
+ingress_rules = filter tfplan.resource_changes as _, resource {
+	resource.type is "aws_vpc_security_group_ingress_rule" and
+		resource.mode is "managed" and
+		resource.change.actions not contains "delete"
+}
+
+# Reject TCP port 22 when it is accessible from the entire internet.
+no_unrestricted_ssh = rule {
+	all ingress_rules as _, ingress {
+		ingress.change.after.ip_protocol is not "tcp" or
+			ingress.change.after.from_port > 22 or
+			ingress.change.after.to_port < 22 or
+			ingress.change.after.cidr_ipv4 is not "0.0.0.0/0"
+	}
+}
+
+main = rule {
+	no_unrestricted_ssh
+}

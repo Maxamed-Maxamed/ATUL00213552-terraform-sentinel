@@ -1,0 +1,19 @@
+import "tfplan/v2" as tfplan
+
+# Find EBS volumes that are being created or updated.
+ebs_volumes = filter tfplan.resource_changes as _, resource {
+	resource.type is "aws_ebs_volume" and
+		resource.mode is "managed" and
+		resource.change.actions not contains "delete"
+}
+
+# Every EBS volume must have encryption enabled.
+all_ebs_volumes_encrypted = rule {
+	all ebs_volumes as _, volume {
+		volume.change.after.encrypted is true
+	}
+}
+
+main = rule {
+	all_ebs_volumes_encrypted
+}
