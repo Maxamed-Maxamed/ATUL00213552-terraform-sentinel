@@ -1,0 +1,25 @@
+import "tfplan/v2" as tfplan
+
+# Define the EC2 instance types approved for this project.
+approved_instance_types = [
+	"t3.micro",
+	"t3.small",
+]
+
+# Find EC2 instances being created or updated.
+ec2_instances = filter tfplan.resource_changes as _, resource {
+	resource.type is "aws_instance" and
+		resource.mode is "managed" and
+		resource.change.actions not contains "delete"
+}
+
+# Every EC2 instance must use an approved instance type.
+all_instance_types_approved = rule {
+	all ec2_instances as _, instance {
+		instance.change.after.instance_type in approved_instance_types
+	}
+}
+
+main = rule {
+	all_instance_types_approved
+}
