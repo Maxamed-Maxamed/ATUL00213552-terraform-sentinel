@@ -1,0 +1,44 @@
+import "tfconfig/v2" as tfconfig
+import "strings"
+
+# Approved AWS provider source and version constraint.
+approved_provider_source = "registry.terraform.io/hashicorp/aws"
+approved_provider_version = "~> 6.0"
+
+# Trusted Terraform Registry module namespace.
+approved_module_prefix = "terraform-aws-modules/"
+
+# Every provider must come from the approved source.
+providers_use_approved_source = rule {
+	all tfconfig.providers as _, provider {
+		provider.full_name is approved_provider_source
+	}
+}
+
+# Every provider must use the approved version constraint.
+providers_use_approved_version = rule {
+	all tfconfig.providers as _, provider {
+		provider.version_constraint is approved_provider_version
+	}
+}
+
+# Every declared module must come from the trusted namespace.
+modules_use_trusted_sources = rule {
+	all tfconfig.module_calls as _, module {
+		strings.has_prefix(module.source, approved_module_prefix)
+	}
+}
+
+# Every declared module must include a version constraint.
+modules_have_pinned_versions = rule {
+	all tfconfig.module_calls as _, module {
+		module.version_constraint is not ""
+	}
+}
+
+main = rule {
+	providers_use_approved_source and
+	providers_use_approved_version and
+	modules_use_trusted_sources and
+	modules_have_pinned_versions
+}

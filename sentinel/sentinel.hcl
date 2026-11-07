@@ -22,3 +22,8 @@ policy "sovereignty" {
   source            = "./sovereignty.sentinel"
   enforcement_level = "hard-mandatory"
 }
+
+policy "supply_chain" {
+  source            = "./supply_chain.sentinel"
+  enforcement_level = "hard-mandatory"
+}
