@@ -157,6 +157,35 @@ The final combined test run found and tested all six policy files successfully.
 
 ![Complete Sentinel test suite](11-complete-sentinel-test-suite.png)
 
+## Terraform plan result
+
+A saved Terraform plan was created using a temporary least-privilege IAM user.
+
+The plan reported:
+
+```text
+Plan: 7 to add, 0 to change, 0 to destroy.
+Saved the plan to: tfplan
+```
+
+The binary plan is stored at:
+
+```text
+terraform/tfplan
+```
+
+A readable copy is stored at:
+
+```text
+terraform/tfplan-output.txt
+```
+
+![Terraform plan created](12-terraform-plan-created.png)
+
+The plan was not applied, so no AWS resources were created. The temporary AWS access key was deleted after the plan was generated.
+
+
+
 ## Conclusion
 
 All six policies produced the expected results.

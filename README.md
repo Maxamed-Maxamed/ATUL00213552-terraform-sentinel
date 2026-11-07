@@ -613,6 +613,33 @@ The final summary reported:
 
 This is the combined evidence that all six policies passed their compliant and non-compliant test scenarios.
 
+### Screenshot 12: Terraform plan created
+
+![Terraform plan created](documentation/evidence/12-terraform-plan-created.png)
+
+This screenshot records the successful creation of the saved Terraform plan.
+
+Terraform reported:
+
+```text
+Plan: 7 to add, 0 to change, 0 to destroy.
+Saved the plan to: tfplan
+```
+
+## Terraform plan evidence
+
+Terraform created a saved plan named:
+
+```text
+terraform/tfplan
+
+Plan: 7 to add, 0 to change, 0 to destroy.
+terraform/tfplan-output.txt
+```
+
+
+
+
 ## Evaluation of Policy-as-Code
 
 In this project, Sentinel changed each security requirement into a rule that could be tested before deployment.
