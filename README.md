@@ -637,7 +637,13 @@ Plan: 7 to add, 0 to change, 0 to destroy.
 terraform/tfplan-output.txt
 ```
 
+### Screenshot 13: GitHub Actions Terraform checks
 
+![GitHub Actions Terraform checks](documentation/evidence/13-github-actions-terraform-checks.png)
+
+This screenshot shows the successful GitHub Actions workflow on the `develop` branch.
+
+The workflow checked the Terraform formatting, initialised the Terraform directory without configuring a backend, and validated the configuration. The green status confirms that the automated checks completed successfully.
 
 
 ## Evaluation of Policy-as-Code
