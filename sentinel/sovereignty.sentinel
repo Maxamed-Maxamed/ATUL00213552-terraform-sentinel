@@ -1,0 +1,15 @@
+import "tfplan/v2" as tfplan
+
+# AWS Europe (Ireland) is the approved region for this project.
+approved_regions = [
+	"eu-west-1",
+]
+
+# Require the Terraform aws_region variable to use an approved region.
+deployment_region_is_approved = rule {
+	tfplan.variables.aws_region.value in approved_regions
+}
+
+main = rule {
+	deployment_region_is_approved
+}
