@@ -1,266 +1,69 @@
 # Sentinel Test Scenarios
 
-## Purpose
+This document lists every test case for the five Sentinel policies. The test files are in `sentinel/test/<policy>/` and the mock data is in `tests/`.
 
-This document explains the compliant and non-compliant mock scenarios used to test the six Sentinel policies.
+There are three kinds of mock data:
 
-Each policy has two tests:
+- **HCP compliant.** Downloaded from the HCP Terraform plan of the `main` branch (7 resources). Stored in `tests/hcp-mocks/compliant/`.
+- **HCP non-compliant.** Downloaded from the HCP Terraform plan of the `demo/non-compliant` branch (10 resources). Stored in `tests/hcp-mocks/non-compliant/`.
+- **Focused mocks.** Small hand-written files in `tests/<policy>/`, each containing one resource that breaks one rule. They use the same structure as the real plan data.
 
-- A compliant scenario expected to return `true`
-- A non-compliant scenario expected to return `false`
+A test passes when the policy returns the expected value. A non-compliant test that shows `PASS` means the policy correctly returned `false`.
 
-The tests use local Sentinel mock data and do not deploy resources to AWS.
+## sovereignty.sentinel
 
-## 1. EBS encryption
+| Test file | Mock data | Expected | What it proves |
+|---|---|---|---|
+| `hcp-compliant.hcl` | HCP compliant | `true` | All 7 real resources are in `eu-west-1` and the sensitive instance has its residency tag |
+| `hcp-non-compliant.hcl` | HCP non-compliant | `false` | The real plan with a volume in `us-east-1` is rejected |
+| `non-compliant-region.hcl` | Instance with `region = "us-east-1"` | `false` | A single resource outside Ireland fails, even though the region variable is unchanged |
+| `non-compliant-sensitive-tag.hcl` | Sensitive instance with no `DataResidency` tag | `false` | Sensitive resources must declare Irish residency |
+| `non-compliant-replication.hcl` | `aws_ebs_snapshot_copy` in `eu-west-1` | `false` | Copy and replication resources are blocked wherever they are |
 
-Policy:
+## supply_chain.sentinel
 
-```text
-sentinel/encryption.sentinel
-```
+| Test file | Mock data | Expected | What it proves |
+|---|---|---|---|
+| `hcp-compliant.hcl` | HCP compliant, plan and configuration | `true` | The real configuration uses `hashicorp/aws` with `~> 6.0` and no modules |
+| `compliant-module.hcl` | `terraform-aws-modules/vpc/aws` at `6.0.1` | `true` | A trusted module pinned to an exact version is accepted |
+| `non-compliant-provider.hcl` | Provider `untrusted/aws` with `>= 4.0` | `false` | An unapproved provider source and constraint are rejected |
+| `non-compliant-module.hcl` | `untrusted-example/vpc/aws` with `>= 5.0` | `false` | An untrusted module and a version range are rejected |
 
-### Compliant scenario
+The non-compliant HCP Terraform plan is not used for this policy. The demo file keeps the approved provider, so the policy correctly passes on that plan.
 
-The mock represents an `aws_ebs_volume` with:
+## ec2.sentinel
 
-```text
-encrypted = true
-```
+| Test file | Mock data | Expected | What it proves |
+|---|---|---|---|
+| `hcp-compliant.hcl` | HCP compliant | `true` | The real instance is `t3.micro` and requires IMDSv2 |
+| `hcp-non-compliant.hcl` | HCP non-compliant | `false` | The real `m5.large` instance with IMDSv1 allowed is rejected |
+| `non-compliant-instance-type.hcl` | Instance of type `m5.large` | `false` | Only approved instance types pass |
+| `non-compliant-imdsv1-allowed.hcl` | Instance with `http_tokens = "optional"` | `false` | IMDSv2 is mandatory |
 
-Expected result:
+## encryption.sentinel
 
-```text
-true
-```
+| Test file | Mock data | Expected | What it proves |
+|---|---|---|---|
+| `hcp-compliant.hcl` | HCP compliant | `true` | The real instance declares an encrypted root volume |
+| `hcp-non-compliant.hcl` | HCP non-compliant | `false` | The real unencrypted volume and root volume are rejected |
+| `non-compliant-root-volume.hcl` | Instance with an unencrypted root volume | `false` | Volumes declared inside an instance are checked |
+| `non-compliant-ebs-volume.hcl` | `aws_ebs_volume` with `encrypted = false` | `false` | Standalone volumes are checked |
 
-### Non-compliant scenario
+## network.sentinel
 
-The mock represents an `aws_ebs_volume` with:
+| Test file | Mock data | Expected | What it proves |
+|---|---|---|---|
+| `hcp-compliant.hcl` | HCP compliant | `true` | The real security group has no inbound rules |
+| `hcp-non-compliant.hcl` | HCP non-compliant | `false` | The real ingress rule opening SSH to `0.0.0.0/0` is rejected |
+| `non-compliant-inline-ssh.hcl` | Inline ingress block, TCP 22 from `0.0.0.0/0` | `false` | Inline rules inside `aws_security_group` are checked |
+| `non-compliant-all-protocols.hcl` | Ingress rule with protocol `-1` from `0.0.0.0/0` | `false` | A rule allowing all traffic counts as allowing SSH |
+| `non-compliant-ipv6-ssh.hcl` | Ingress rule, TCP 22 from `::/0` | `false` | IPv6 is checked as well as IPv4 |
 
-```text
-encrypted = false
-```
-
-Expected result:
-
-```text
-false
-```
-
-The non-compliant scenario confirms that the policy rejects an unencrypted EBS volume.
-
-## 2. EC2 instance type
-
-Policy:
-
-```text
-sentinel/instance_type.sentinel
-```
-
-### Compliant scenario
-
-The mock uses the approved instance type:
-
-```text
-t3.micro
-```
-
-Expected result:
-
-```text
-true
-```
-
-### Non-compliant scenario
-
-The mock uses:
-
-```text
-m5.large
-```
-
-Expected result:
-
-```text
-false
-```
-
-The non-compliant scenario confirms that the policy rejects an instance type outside the approved list.
-
-## 3. EC2 metadata and IMDSv2
-
-Policy:
-
-```text
-sentinel/metadata.sentinel
-```
-
-### Compliant scenario
-
-The mock uses:
-
-```text
-http_tokens = "required"
-```
-
-Expected result:
-
-```text
-true
-```
-
-### Non-compliant scenario
-
-The mock uses:
-
-```text
-http_tokens = "optional"
-```
-
-Expected result:
-
-```text
-false
-```
-
-The non-compliant scenario confirms that the policy rejects an EC2 configuration that does not require IMDSv2.
-
-## 4. Network security
-
-Policy:
-
-```text
-sentinel/network.sentinel
-```
-
-### Compliant scenario
-
-The mock represents a TCP ingress rule for port 22 with the source:
-
-```text
-10.0.0.0/24
-```
-
-Expected result:
-
-```text
-true
-```
-
-### Non-compliant scenario
-
-The mock represents a TCP ingress rule for port 22 with the source:
-
-```text
-0.0.0.0/0
-```
-
-Expected result:
-
-```text
-false
-```
-
-The non-compliant scenario confirms that the policy rejects unrestricted inbound SSH from the IPv4 internet.
-
-## 5. Digital sovereignty
-
-Policy:
-
-```text
-sentinel/sovereignty.sentinel
-```
-
-### Compliant scenario
-
-The mock uses the approved AWS Europe (Ireland) region:
-
-```text
-eu-west-1
-```
-
-Expected result:
-
-```text
-true
-```
-
-### Non-compliant scenario
-
-The mock uses:
-
-```text
-us-east-1
-```
-
-Expected result:
-
-```text
-false
-```
-
-The non-compliant scenario confirms that the policy rejects a region outside the approved list.
-
-This test covers the Terraform `aws_region` variable only. It does not prove that backups, logs, administrative access, or external services remain in Ireland.
-
-## 6. Terraform supply-chain security
-
-Policy:
-
-```text
-sentinel/supply_chain.sentinel
-```
-
-### Compliant scenario
-
-The mock uses:
-
-- Provider source `registry.terraform.io/hashicorp/aws`
-- Provider constraint `~> 6.0`
-- Module source beginning with `terraform-aws-modules/`
-- A module version constraint
-
-Expected result:
-
-```text
-true
-```
-
-### Non-compliant scenario
-
-The mock uses:
-
-- An unapproved provider publisher
-- An unapproved provider constraint
-- An untrusted module source
-- An empty module version constraint
-
-Expected result:
-
-```text
-false
-```
-
-The current Terraform configuration does not use an external module. The module rules were tested with `tfconfig/v2` mock data to show how the policy would behave if modules were added later.
-
-## Complete test-suite result
-
-The complete suite was run from the `sentinel` directory:
+## Running the tests
 
 ```powershell
-sentinel test -verbose
+cd sentinel
+sentinel test
 ```
 
-The final result was:
-
-```text
-PASS - encryption.sentinel
-PASS - instance_type.sentinel
-PASS - metadata.sentinel
-PASS - network.sentinel
-PASS - sovereignty.sentinel
-PASS - supply_chain.sentinel
-6 tests completed
-```
-
-All compliant scenarios returned `true`, and all non-compliant scenarios returned `false`.
+Expected result: five policies pass, 22 test cases in total.

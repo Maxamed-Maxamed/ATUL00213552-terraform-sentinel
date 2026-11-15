@@ -7,6 +7,8 @@ on:
       - develop
     paths:
       - "terraform/**"
+      - "sentinel/**"
+      - "tests/**"
       - ".github/workflows/terraform-checks.yml"
 
   pull_request:
@@ -14,6 +16,8 @@ on:
       - main
     paths:
       - "terraform/**"
+      - "sentinel/**"
+      - "tests/**"
       - ".github/workflows/terraform-checks.yml"
 
 permissions:
@@ -46,3 +50,34 @@ jobs:
 
       - name: Validate Terraform
         run: terraform validate
+
+  sentinel-tests:
+    name: Sentinel Policy Tests
+    runs-on: ubuntu-latest
+
+    env:
+      SENTINEL_VERSION: "0.41.0"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      # The download is checked against the published SHA256 sums before
+      # it is used, so a tampered binary stops the job.
+      - name: Install Sentinel CLI with checksum verification
+        run: |
+          base="https://releases.hashicorp.com/sentinel/${SENTINEL_VERSION}"
+          zip="sentinel_${SENTINEL_VERSION}_linux_amd64.zip"
+          curl -sSfLO "${base}/${zip}"
+          curl -sSfLO "${base}/sentinel_${SENTINEL_VERSION}_SHA256SUMS"
+          grep "${zip}" "sentinel_${SENTINEL_VERSION}_SHA256SUMS" | sha256sum -c -
+          mkdir -p "${HOME}/bin"
+          unzip -q "${zip}" -d "${HOME}/bin"
+          echo "${HOME}/bin" >> "${GITHUB_PATH}"
+
+      - name: Show Sentinel version
+        run: sentinel version
+
+      - name: Run Sentinel tests
+        working-directory: sentinel
+        run: sentinel test
