@@ -1,109 +1,195 @@
-# Policy Evaluation Results
+# Sentinel Policy Test Results
 
-This document records the results of evaluating the five Sentinel policies, in HCP Terraform and locally.
+## Purpose
 
-## Environment
+This document records the local Sentinel tests completed for the Terraform Sentinel assignment.
 
-| Item | Value |
-|---|---|
-| HCP Terraform organisation | `atul00213552-maxamed` |
-| Workspace | `ATUL00213552-terraform-sentinel` |
-| Policy set | `ireland-sovereignty-policies` (individually managed, platform environment) |
-| Terraform version in HCP Terraform | 1.17.2 |
-| Sentinel version in HCP Terraform | 0.40.x (platform environment) |
-| Sentinel CLI version locally | 0.41.0 |
-| Local machine | Windows 11, PowerShell |
-| AWS deployment performed | No. All runs were plan only. |
+Each policy was tested with:
 
-## 1. Compliant plan in HCP Terraform
+- One compliant mock expected to return `true`
+- One non-compliant mock expected to return `false`
 
-Run name: "Compliant plan with Sentinel policy check". Source: `main` branch.
+A non-compliant test showing `PASS` means that Sentinel correctly returned `false` and rejected the configuration as expected.
 
-| Stage | Result |
-|---|---|
-| Plan | 7 to add, 0 to change, 0 to destroy |
-| Policy check | 5 of 5 passed |
+## Test environment
 
-| Policy | Level | Result |
-|---|---|---|
-| `sovereignty` | Hard mandatory | Passed |
-| `supply_chain` | Advisory | Passed |
-| `ec2` | Advisory | Passed |
-| `encryption` | Advisory | Passed |
-| `network` | Advisory | Passed |
+- Operating system: Windows 11 Pro
+- Terminal: PowerShell
+- Sentinel CLI version: `0.41.0`
+- Development branch: `develop`
+- Testing method: Local Sentinel mock data
+- AWS deployment performed: No
 
-![Compliant run](21-hcp-compliant-run-5-of-5-passed.png)
+## Test command
 
-![Compliant policy results](22-hcp-compliant-policy-results.png)
-
-## 2. Non-compliant plan in HCP Terraform
-
-Run name: "Demo/non compliant". Source: pull request 2 from the `demo/non-compliant` branch, which adds `terraform/non_compliant_demo.tf`.
-
-| Stage | Result |
-|---|---|
-| Plan | 10 to add, 0 to change, 0 to destroy |
-| Policy check | Hard failed: 1 hard failed, 3 advisory failed |
-
-| Policy | Level | Result | Cause in the demo file |
-|---|---|---|---|
-| `sovereignty` | Hard mandatory | Failed | EBS volume in `us-east-1`, tagged sensitive with no `DataResidency` tag |
-| `supply_chain` | Advisory | Passed | The approved provider is still used |
-| `ec2` | Advisory | Failed | `m5.large` instance with `http_tokens = "optional"` |
-| `encryption` | Advisory | Failed | Unencrypted EBS volume and unencrypted root volume |
-| `network` | Advisory | Failed | SSH open to `0.0.0.0/0` |
-
-The plan stage succeeded, so the configuration was valid Terraform. The run was stopped by the hard mandatory policy before the apply stage.
-
-![Non-compliant run blocked](24-hcp-non-compliant-run-blocked.png)
-
-![Non-compliant policy results](25-hcp-non-compliant-policy-results.png)
-
-![Pull request check failed](23-github-pr-hcp-check-failed.png)
-
-## 3. Local Sentinel tests
-
-Command, run from the `sentinel` directory:
+The complete test suite was run from the `sentinel` directory:
 
 ```powershell
-sentinel test
+sentinel test -verbose
 ```
 
-Result: all five policies pass, 22 test cases.
+The final output reported:
 
-| Policy | Test cases | Against HCP compliant mocks | Against HCP non-compliant mocks | Focused mocks |
-|---|---:|---|---|---:|
-| `sovereignty` | 5 | `true` | `false` | 3 |
-| `supply_chain` | 4 | `true` | Not used | 3 |
-| `ec2` | 4 | `true` | `false` | 2 |
-| `encryption` | 4 | `true` | `false` | 2 |
-| `network` | 5 | `true` | `false` | 3 |
+```text
+PASS - encryption.sentinel
+PASS - instance_type.sentinel
+PASS - metadata.sentinel
+PASS - network.sentinel
+PASS - sovereignty.sentinel
+PASS - supply_chain.sentinel
+6 tests completed
+```
 
-Each test case is described in `tests/test-scenarios.md`.
+## Results summary
 
-![Sentinel tests, 22 cases](26-sentinel-tests-22-cases.png)
+| Policy | Compliant scenario | Result | Non-compliant scenario | Result |
+|---|---|---:|---|---:|
+| EBS encryption | Encryption enabled | `true` | Encryption disabled | `false` |
+| Instance type | `t3.micro` | `true` | `m5.large` | `false` |
+| Metadata | IMDSv2 required | `true` | IMDS tokens optional | `false` |
+| Network | SSH limited to `10.0.0.0/24` | `true` | SSH open to `0.0.0.0/0` | `false` |
+| Sovereignty | Region `eu-west-1` | `true` | Region `us-east-1` | `false` |
+| Supply chain | Approved provider and module mock | `true` | Unapproved provider and module mock | `false` |
 
-## 4. Terraform plan file
+## EBS encryption test
 
-A saved plan was created locally with `terraform plan -out=tfplan` and is stored at `terraform/tfplan`. A readable copy is at `terraform/tfplan-output.txt`. It reports 7 resources to add, the same as the compliant HCP Terraform run.
+Policy file:
+
+```text
+sentinel/encryption.sentinel
+```
+
+The compliant mock represents an encrypted EBS volume and returned `true`.
+
+The non-compliant mock represents an unencrypted EBS volume and returned `false`.
+
+![EBS encryption policy tests](05-encryption-policy-tests.png)
+
+## EC2 instance-type test
+
+Policy file:
+
+```text
+sentinel/instance_type.sentinel
+```
+
+The compliant mock uses the approved `t3.micro` instance type and returned `true`.
+
+The non-compliant mock uses `m5.large`, which is outside the approved list, and returned `false`.
+
+![EC2 instance-type policy tests](06-instance-type-policy-tests.png)
+
+## IMDSv2 test
+
+Policy file:
+
+```text
+sentinel/metadata.sentinel
+```
+
+The compliant mock sets `http_tokens` to `required` and returned `true`.
+
+The non-compliant mock sets `http_tokens` to `optional` and returned `false`.
+
+![IMDSv2 policy tests](07-metadata-imdsv2-policy-tests.png)
+
+## Network security test
+
+Policy file:
+
+```text
+sentinel/network.sentinel
+```
+
+The compliant mock limits SSH access to `10.0.0.0/24` and returned `true`.
+
+The non-compliant mock exposes TCP port 22 to `0.0.0.0/0` and returned `false`.
+
+![Network policy tests](08-network-policy-tests.png)
+
+## Digital-sovereignty test
+
+Policy file:
+
+```text
+sentinel/sovereignty.sentinel
+```
+
+The compliant mock uses the approved Ireland region, `eu-west-1`, and returned `true`.
+
+The non-compliant mock uses `us-east-1` and returned `false`.
+
+![Digital-sovereignty policy tests](09-sovereignty-policy-tests.png)
+
+## Terraform supply-chain test
+
+Policy file:
+
+```text
+sentinel/supply_chain.sentinel
+```
+
+The compliant mock uses:
+
+- The approved HashiCorp AWS provider source
+- The approved provider version constraint
+- A trusted module namespace
+- A module version constraint
+
+The compliant mock returned `true`.
+
+The non-compliant mock uses:
+
+- An unapproved provider publisher
+- An unapproved provider constraint
+- An untrusted module source
+- No module version constraint
+
+The non-compliant mock returned `false`.
+
+The current Terraform configuration does not use an external module. The module controls were tested with `tfconfig/v2` mock data.
+
+![Terraform supply-chain policy tests](10-supply-chain-policy-tests.png)
+
+## Complete Sentinel test suite
+
+The final combined test run found and tested all six policy files successfully.
+
+![Complete Sentinel test suite](11-complete-sentinel-test-suite.png)
+
+## Terraform plan result
+
+A saved Terraform plan was created using a temporary least-privilege IAM user.
+
+The plan reported:
+
+```text
+Plan: 7 to add, 0 to change, 0 to destroy.
+Saved the plan to: tfplan
+```
+
+The binary plan is stored at:
+
+```text
+terraform/tfplan
+```
+
+A readable copy is stored at:
+
+```text
+terraform/tfplan-output.txt
+```
 
 ![Terraform plan created](12-terraform-plan-created.png)
 
-## 5. HCP Terraform configuration evidence
+The plan was not applied, so no AWS resources were created. The temporary AWS access key was deleted after the plan was generated.
 
-| Screenshot | Shows |
-|---|---|
-| `14-hcp-workspace-created.png` | Workspace linked to the GitHub repository |
-| `15-hcp-first-plan.png` | First successful plan in HCP Terraform |
-| `16-sentinel-tests-with-hcp-mocks.png` | First local test run against real HCP Terraform mock data |
-| `17-hcp-policy-set-options.png` | Version control policy sets are not available on the Free edition |
-| `19-hcp-one-mandatory-policy-limit.png` | Only one mandatory policy is allowed on the Free edition |
-| `20-hcp-five-policies-in-policy-set.png` | The five policies in the policy set |
 
-## 6. Earlier evidence
-
-Screenshots 01 to 13 come from the first version of the project. Screenshots 05 to 11 show six earlier policies tested against hand-written mocks. Those policies were replaced after testing against real plan data showed that they did not cover the resources in the Terraform configuration.
 
 ## Conclusion
 
-The compliant plan passed every policy and the non-compliant plan was stopped in HCP Terraform before apply. The local tests reproduce both results from the same plan data and cover each failure case separately. Only the sovereignty policy can stop a run on the Free edition. The other four report their failures as advisory.
+All six policies produced the expected results.
+
+The compliant mocks returned `true`, while the non-compliant mocks returned `false`. The tests show that the implemented policies can distinguish the approved project configurations from the non-compliant scenarios represented by the mock data.
+
+The tests did not deploy resources to AWS. They cover the scenarios included in this project and do not represent every possible Terraform configuration.
