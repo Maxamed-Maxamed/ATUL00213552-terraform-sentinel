@@ -6,7 +6,7 @@ This project uses Terraform to describe a small AWS environment and HashiCorp Se
 
 The policies were tested locally with Sentinel mock data. Each policy has a compliant example expected to return `true` and a non-compliant example expected to return `false`.
 
-The evidence in this repository shows local Terraform validation and local Sentinel testing. It does not claim that the infrastructure was deployed to AWS or that HCP Terraform integration was completed.
+The evidence in this repository shows local Terraform validation, Terraform plan creation, and local Sentinel testing. It does not claim that the infrastructure was deployed to AWS or that HCP Terraform integration was completed.
 
 ## Student and project details
 
@@ -32,6 +32,7 @@ The project addresses the following requirements:
 - Restrict Terraform providers to an approved source and version constraint.
 - Require trusted Terraform module sources and version constraints.
 - Demonstrate compliant and non-compliant policy evaluations.
+- Explain how policy enforcement prevents non-compliant deployments.
 - Record test results and screenshots as evidence.
 
 ## Repository structure
@@ -54,6 +55,8 @@ ATUL00213552-terraform-sentinel/
 │   │   ├── 09-sovereignty-policy-tests.png
 │   │   ├── 10-supply-chain-policy-tests.png
 │   │   ├── 11-complete-sentinel-test-suite.png
+│   │   ├── 12-terraform-plan-created.png
+│   │   ├── 13-github-actions-terraform-checks.png
 │   │   └── test-results.md
 │   └── technical-report/
 │       └── README.md
@@ -131,6 +134,40 @@ enforcement_level = "hard-mandatory"
 A hard-mandatory policy is intended to prevent a non-compliant configuration from continuing in a Sentinel-enabled deployment workflow.
 
 Six policies were implemented and tested.
+
+## How policy enforcement prevents non-compliant deployments
+
+Terraform first creates an execution plan describing the infrastructure that it intends to create or change. Sentinel can then evaluate the Terraform configuration or plan against the project's Policy-as-Code rules before the infrastructure is applied.
+
+Each policy in `sentinel/sentinel.hcl` is configured with:
+
+```hcl
+enforcement_level = "hard-mandatory"
+```
+
+In a Sentinel-enabled Terraform workflow, a compliant configuration returns `true`, allowing the policy evaluation to pass. A non-compliant configuration returns `false`.
+
+When a hard-mandatory policy returns `false`, the policy evaluation fails and the Terraform run cannot continue to the apply stage unless the configuration is corrected.
+
+For example, the policies in this project reject configurations that:
+
+- Create an unencrypted EBS volume.
+- Use an EC2 instance type outside the approved list.
+- Allow IMDSv1 by setting metadata tokens to `optional`.
+- Open inbound SSH on TCP port 22 to `0.0.0.0/0`.
+- Select an AWS region outside `eu-west-1`.
+- Use an unapproved Terraform provider.
+- Use an untrusted or unversioned Terraform module source.
+
+The compliant and non-compliant Sentinel mock tests demonstrate these policy decisions. The compliant scenarios return `true`, while the non-compliant scenarios return `false`.
+
+A non-compliant test may still be labelled `PASS` by the Sentinel CLI. This means that the test expected the policy to return `false` and Sentinel produced the expected result. It does not mean that the non-compliant configuration was accepted.
+
+This type of enforcement takes place before infrastructure is applied. It reduces the risk that insecure, geographically non-compliant, or unapproved infrastructure will be created. The configuration must be corrected and evaluated again before it can satisfy the policies.
+
+In this project, enforcement was demonstrated through local Sentinel mock testing. The repository was not connected to an HCP Terraform policy set, so the project demonstrates the policy decisions but does not claim that a real remote deployment was blocked.
+
+In an integrated HCP Terraform workflow, the hard-mandatory policies would provide the deployment gate before the apply stage.
 
 ## 1. EBS encryption policy
 
@@ -265,7 +302,7 @@ The approved region is:
 eu-west-1
 ```
 
-I selected `eu-west-1` because it is the AWS Europe (Ireland) region and matches the Irish data-residency focus of the assignment.
+I selected `eu-west-1` because it is the AWS Europe (Ireland) Region and matches the Irish data-residency focus of the assignment.
 
 AWS explains that customers can choose AWS Regions based on geographical, operational, and regulatory requirements [3].
 
@@ -274,11 +311,19 @@ AWS explains that customers can choose AWS Regions based on geographical, operat
 - Compliant: `aws_region = "eu-west-1"`
 - Non-compliant: `aws_region = "us-east-1"`
 
-The Ireland region returned `true`. The non-approved region returned `false`.
+The Ireland Region returned `true`. The non-approved region returned `false`.
+
+### How jurisdictional restrictions contribute to digital sovereignty
+
+Restricting infrastructure to an approved jurisdiction helps an organisation control where its data and computing resources are located. This can support data-residency requirements, regulatory compliance, organisational governance, and decisions about which legal jurisdiction may apply to stored or processed data.
+
+The policy restricts the project to the AWS Europe (Ireland) Region. This provides a clear geographical control for the resources represented in the Terraform configuration or plan.
+
+However, region selection alone cannot guarantee complete legal or operational sovereignty. Digital sovereignty also depends on factors such as identity management, encryption-key ownership, backup locations, replication, administrative access, contracts, third-party services, and applicable laws.
 
 ### Limits of the region control
 
-Restricting the Terraform region creates a clear geographical rule for resources represented in the plan. However, selecting one AWS region does not guarantee complete digital sovereignty.
+Restricting the Terraform region creates a clear geographical rule for resources represented in the plan. However, selecting one AWS Region does not guarantee complete digital sovereignty.
 
 Other factors may include:
 
@@ -334,6 +379,16 @@ The module rules were tested with `tfconfig/v2` mock data. The compliant mock us
 
 These tests show how the policy would react if modules were added later. They do not mean that an external module has already been implemented.
 
+### Importance of supply-chain integrity
+
+Terraform providers and modules are dependencies that can influence how infrastructure is created and managed. An untrusted, altered, or compromised dependency could introduce insecure behaviour even when the main Terraform configuration appears correct.
+
+Restricting provider and module sources reduces the risk of using dependencies from unapproved publishers. Version constraints make dependency selection more predictable and allow changes to be reviewed.
+
+The `.terraform.lock.hcl` file records the selected provider release and package checksums. Committing this file to Git makes unexpected provider changes more visible during code review.
+
+Supply-chain integrity still requires additional controls, including dependency review, trusted registries, checksum verification, version management, code review, automated scanning, and controlled update processes.
+
 ### Supply-chain limitations
 
 The policy checks declared sources and version constraints. It does not inspect provider or module source code for malicious behaviour.
@@ -341,6 +396,17 @@ The policy checks declared sources and version constraints. It does not inspect 
 The Terraform dependency lock file records provider selections and checksums. HashiCorp explains that the lock file tracks provider dependencies but does not currently lock remote module selections [4].
 
 A remote module would therefore need a carefully selected and reviewed version if one were added later.
+
+Supply-chain risks that cannot be fully addressed through Sentinel alone include:
+
+- A trusted publisher account becoming compromised.
+- Malicious code being introduced into an approved dependency.
+- Vulnerabilities discovered after a policy evaluation.
+- Compromise of a registry, source-code repository, or build system.
+- Stolen credentials or unauthorised administrative access.
+- Runtime changes made outside Terraform.
+- An approved dependency version containing an unknown vulnerability.
+- Weak code-review or dependency-update processes.
 
 ## Testing approach
 
@@ -350,6 +416,8 @@ Each policy has two mock scenarios:
 - A non-compliant configuration expected to return `false`
 
 A non-compliant test can still appear as `PASS` in the Sentinel output. This means that the test expected the policy to return `false`, and Sentinel returned the expected value.
+
+The mock tests verify the policy decisions without creating AWS resources.
 
 ## Test summary
 
@@ -413,7 +481,7 @@ sentinel test -verbose .\encryption.sentinel
 
 ## Evidence and screenshot explanations
 
-The screenshots below record the main repository setup, Terraform validation, individual Sentinel policy tests, and final combined test results.
+The screenshots below record the main repository setup, Terraform validation, individual Sentinel policy tests, Terraform plan creation, the complete test results, and GitHub Actions checks.
 
 ### Screenshot 01: Development branch created
 
@@ -456,7 +524,7 @@ Validation does not mean that the infrastructure was deployed to AWS. It checks 
 
 ### Screenshot 05: EBS encryption policy tests
 
-![EBS encryption policy tests](documentation/evidence/05-encryption-policy-tests.png)
+![EBS encryption policy tests](documentation/evidence/05-encryption-policy-tests.png) 
 
 This screenshot shows the compliant and non-compliant tests for `encryption.sentinel`.
 
@@ -472,11 +540,11 @@ The non-compliant unencrypted-volume mock returned:
 Value: false
 ```
 
-Both cases display `PASS` because Sentinel returned the expected result for each test. The encrypted volume was accepted, while the unencrypted volume was rejected.
+Both cases display `PASS` because Sentinel returned the expected result for each test. The encrypted volume was accepted, while the unencrypted volume was rejected by the policy logic.
 
 ### Screenshot 06: EC2 instance-type policy tests
 
-![EC2 instance-type policy tests](documentation/evidence/06-instance-type-policy-tests.png)
+![EC2 instance-type policy tests](documentation/evidence/06-instance-type-policy-tests.png) 
 
 This screenshot shows the tests for `instance_type.sentinel`.
 
@@ -496,7 +564,7 @@ The result confirms that the policy accepts the selected project instance types 
 
 ### Screenshot 07: IMDSv2 policy tests
 
-![IMDSv2 policy tests](documentation/evidence/07-metadata-imdsv2-policy-tests.png)
+![IMDSv2 policy tests](documentation/evidence/07-metadata-imdsv2-policy-tests.png)  
 
 This screenshot shows the tests for `metadata.sentinel`.
 
@@ -552,7 +620,7 @@ The non-compliant `us-east-1` region returned:
 Value: false
 ```
 
-The result confirms that the policy restricts the Terraform `aws_region` variable to the approved Ireland region.
+The result confirms that the policy restricts the Terraform `aws_region` variable to the approved Ireland Region.
 
 ### Screenshot 10: Terraform supply-chain policy tests
 
@@ -589,7 +657,6 @@ Value: false
 The current Terraform configuration does not use an external module. The module controls were tested with `tfconfig/v2` mock data to show how the policy would behave if modules were added later.
 
 ### Screenshot 11: Complete Sentinel test suite
-
 ![Complete Sentinel test suite](documentation/evidence/11-complete-sentinel-test-suite.png)
 
 This screenshot records the final complete Sentinel test run.
@@ -626,16 +693,22 @@ Plan: 7 to add, 0 to change, 0 to destroy.
 Saved the plan to: tfplan
 ```
 
+The plan was saved for assignment evidence. The infrastructure was not applied to AWS.
+
 ## Terraform plan evidence
 
-Terraform created a saved plan named:
+Terraform created the following plan evidence:
+
+- `terraform/tfplan` contains the saved binary Terraform plan.
+- `terraform/tfplan-output.txt` contains the readable Terraform plan output.
+
+The plan summary was:
 
 ```text
-terraform/tfplan
-
 Plan: 7 to add, 0 to change, 0 to destroy.
-terraform/tfplan-output.txt
 ```
+
+The plan was created for validation and evidence. The infrastructure was not applied to AWS.
 
 ### Screenshot 13: GitHub Actions Terraform checks
 
@@ -643,8 +716,7 @@ terraform/tfplan-output.txt
 
 This screenshot shows the successful GitHub Actions workflow on the `develop` branch.
 
-The workflow checked the Terraform formatting, initialised the Terraform directory without configuring a backend, and validated the configuration. The green status confirms that the automated checks completed successfully.
-
+The workflow checked Terraform formatting, initialised the Terraform directory without configuring a backend, and validated the configuration. The green status confirms that the automated checks completed successfully.
 
 ## Evaluation of Policy-as-Code
 
@@ -658,15 +730,17 @@ The approach worked well for information available in Terraform configuration or
 - EC2 instance type
 - EC2 metadata options
 - Security-group ingress rules
-- AWS region
+- AWS Region
 - Provider source
 - Provider version constraint
 - Module source
 - Module version constraint
 
-The result still depends on the quality of the policy. A policy can miss an alternative Terraform resource, a new provider field, or a configuration pattern that was not considered.
+Policy-as-Code improves consistency because the same rules can be evaluated for every Terraform configuration. It also produces repeatable evidence and allows policy changes to be reviewed through Git.
 
-Mock tests also prove only the scenarios that were written. They do not cover every possible Terraform configuration.
+However, the effectiveness of Policy-as-Code depends on the quality and coverage of the policies. A policy can miss an alternative Terraform resource, a new provider field, or a configuration pattern that was not considered.
+
+Mock tests prove only the scenarios that were written. They do not cover every possible Terraform configuration.
 
 ## Limitations of the current implementation
 
@@ -675,12 +749,47 @@ The current implementation has the following limits:
 - The policies were tested locally with Sentinel mocks rather than through a completed HCP Terraform policy set.
 - The project does not show a real AWS deployment.
 - The sovereignty policy checks the `aws_region` variable but cannot prove the location of every log, backup, administrative action, or connected service.
+- Region-based controls do not by themselves address legal jurisdiction, contracts, support access, identity controls, or encryption-key ownership.
 - The network policy checks `aws_vpc_security_group_ingress_rule`, so other security-group resource patterns would need additional checks.
 - The network policy checks IPv4 `0.0.0.0/0` but does not check IPv6 `::/0`.
 - Sentinel evaluates configuration and plan information but does not continuously monitor resources after deployment.
 - Manual AWS Console changes could create infrastructure drift after policy evaluation.
 - The supply-chain policy checks declared sources and constraints but cannot prove that provider or module code is free from malicious behaviour.
 - Module controls were tested with mocks because the Terraform configuration does not currently use an external module.
+- Sentinel cannot detect every compromised dependency, stolen credential, runtime attack, or change made outside Terraform.
+- Cloud services and Terraform providers change over time, so policies must be reviewed and updated to remain effective.
+
+## Limitations of Sentinel and plan-time enforcement
+
+Sentinel evaluates the information available when a Terraform configuration or plan is checked. It does not provide continuous runtime monitoring after infrastructure has been deployed.
+
+A configuration may pass a policy evaluation and later become non-compliant because of:
+
+- Manual changes made through the AWS Console or AWS CLI.
+- Infrastructure drift.
+- Changes made by another automation system.
+- New vulnerabilities discovered after deployment.
+- Changes in organisational or legal requirements.
+- Compromised credentials.
+- Runtime activity that is not represented in the Terraform plan.
+
+Plan-time enforcement should therefore be supported by runtime controls such as AWS Config, AWS CloudTrail, IAM least privilege, security monitoring, vulnerability management, and regular compliance reviews.
+
+## Challenges of maintaining policies
+
+Cloud platforms, Terraform providers, resource schemas, security recommendations, and legal requirements change over time.
+
+A policy written for one resource type or attribute may not recognise a newer Terraform configuration pattern. New provider versions can add or change resource fields. The approved AWS Regions, instance types, provider versions, and module sources may also need to change.
+
+Policies should therefore be:
+
+- Stored in version control.
+- Reviewed through pull requests.
+- Tested with compliant and non-compliant scenarios.
+- Updated when Terraform providers or cloud services change.
+- Reviewed when security or legal requirements change.
+- Monitored for gaps and false results.
+- Supported by clear ownership and documentation.
 
 ## Suggested future improvements
 
@@ -697,6 +806,8 @@ The following items are suggestions and are not part of the current implementati
 - Add an approved Amazon Machine Image policy.
 - Add KMS key requirements.
 - Add an external Terraform module only after selecting and reviewing a specific trusted module and version.
+- Add automated tests for additional Terraform resource patterns.
+- Introduce a regular policy-review process for new provider versions and AWS service changes.
 
 ## Security considerations
 
@@ -735,24 +846,33 @@ After the code, evidence, README, test documentation, and technical report have 
 
 Microsoft Copilot, powered by GPT-5.6, was used during this project to:
 
-- Explain unfamiliar Git, Terraform, and Sentinel commands
-- Review Sentinel syntax
-- Help diagnose terminal errors
-- Suggest a structure for Sentinel mock tests
-- Improve the organisation of the repository
-- Identify suitable screenshot points
-- Improve the clarity and grammar of the documentation
-- Locate relevant official AWS and HashiCorp documentation
+- Explain unfamiliar Git, Terraform, and Sentinel commands.
+- Review Sentinel syntax.
+- Help diagnose terminal errors.
+- Suggest a structure for Sentinel mock tests.
+- Improve the organisation of the repository.
+- Identify suitable screenshot points.
+- Improve the clarity and grammar of the documentation.
+- Locate relevant official AWS and HashiCorp documentation.
 
 Representative prompts included:
 
-- “Please start from beginner level.”
-- “Are we meant to follow this folder structure?”
+- “explain the concept of EBS encryption.”
+- “ Tutorial of terraform AWS “
+- “explain the concept of IMDSv2.”
+- “explain the concept of digital sovereignty.”
+- “explain the concept of supply-chain security.”
+- “explain the concept of policy-as-code.”
+- “what is the difference between a policy and a rule?”
+- “what is the difference between a compliant and a non-compliant test?”
+- “what is the difference between a hard-mandatory and a soft-mandatory policy?”
+- 
 - “Help me create compliant and non-compliant Sentinel tests.”
 - “Why is the `tfplan/v2` import not available?”
-- “Tell me when I need to take a screenshot for the assignment.”
 - “Please use clear, natural academic English in the README.”
 - “Do not add technical features that I have not implemented.”
+- 
+
 
 I created and managed the repository, ran the Terraform and Sentinel commands, reviewed the policy logic, corrected syntax and file-location errors, captured the evidence, and managed the Git commits.
 
@@ -764,31 +884,59 @@ The project demonstrates how Terraform and Sentinel can be used together to chec
 
 Six Sentinel policies were created and tested. The policies accepted the compliant mock configurations and rejected the non-compliant configurations as expected.
 
+The hard-mandatory configuration shows how these policies can act as a deployment gate in a Sentinel-enabled workflow. A configuration that returns `false` must be corrected before it can satisfy the policy and proceed to the apply stage.
+
+The local mock tests demonstrate the policy decisions, but the project does not claim that an HCP Terraform policy set blocked a real AWS deployment.
+
 The project also shows the limits of Policy-as-Code. Region selection alone does not provide complete digital sovereignty, and plan-time checks do not replace runtime monitoring, identity controls, dependency review, legal analysis, or post-deployment compliance checks.
 
 ## References
 
-1. Amazon Web Services, “Amazon EBS encryption.” Available at: [AWS EBS encryption documentation](https://docs.aws.amazon.com/ebs/latest/userguide/ebs-encryption.html)
+1. Amazon Web Services, “Amazon EBS encryption.” Available at:  
+   [AWS EBS encryption documentation](https://docs.aws.amazon.com/ebs/latest/userguide/ebs-encryption.html)
 
-2. Amazon Web Services, “Modify instance metadata options for existing instances.” Available at: [AWS EC2 metadata-options documentation](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-IMDS-existing-instances.md)
+2. Amazon Web Services, “Modify instance metadata options for existing instances.” Available at:  
+   https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-IMDS-existing-instances.html
 
-3. Amazon Web Services, “AWS Regions.” Available at: [AWS Regions documentation](https://docs.aws.amazon.com/global-infrastructure/latest/regions/aws-regions.html)
+3. Amazon Web Services, “AWS Regions.” Available at:  
+   [AWS Regions documentation](https://docs.aws.amazon.com/global-infrastructure/latest/regions/aws-regions.html)
 
-4. HashiCorp, “Dependency Lock File.” Available at: [Terraform dependency lock-file documentation](https://developer.hashicorp.com/terraform/language/files/dependency-lock)
+4. HashiCorp, “Dependency Lock File.” Available at:  
+   [Terraform dependency lock-file documentation](https://developer.hashicorp.com/terraform/language/files/dependency-lock)
 
-5. HashiCorp, “tfconfig/v2.” Available at: [Sentinel tfconfig/v2 documentation](https://developer.hashicorp.com/sentinel/docs/features/terraform/tfconfig-v2)
+5. HashiCorp, “tfconfig/v2.” Available at:  
+   [Sentinel tfconfig/v2 documentation](https://developer.hashicorp.com/sentinel/docs/features/terraform/tfconfig-v2)
 
-6. HashiCorp, “Sentinel enforcement levels.” Available at: [Sentinel enforcement-level documentation](https://developer.hashicorp.com/sentinel/docs/concepts/enforcement-levels)
+6. HashiCorp, “Sentinel enforcement levels.” Available at:  
+   [Sentinel enforcement-level documentation](https://developer.hashicorp.com/sentinel/docs/concepts/enforcement-levels)
 
-7. HashiCorp, “Sentinel CLI configuration file syntax.” Available at: [Sentinel configuration documentation](https://developer.hashicorp.com/sentinel/docs/configuration)
+7. HashiCorp, “Sentinel CLI configuration file syntax.” Available at:  
+   [Sentinel configuration documentation](https://developer.hashicorp.com/sentinel/docs/configuration)
 
-8. HashiCorp, “Terraform provider requirements.” Available at: [Terraform provider-requirements documentation](https://developer.hashicorp.com/terraform/language/providers/requirements)
+8. HashiCorp, “Terraform provider requirements.” Available at:  
+   [Terraform provider-requirements documentation](https://developer.hashicorp.com/terraform/language/providers/requirements)
 
-9. HashiCorp, “Get started with Terraform and AWS.” Available at: [Terraform AWS tutorial](https://developer.hashicorp.com/terraform/tutorials/aws-get-started)
-10. HashiCorp, “Terraform validate command.” Available at: [Terraform validate documentation](https://developer.hashicorp.com/terraform/cli/commands/validate)
-11. HashiCorp, “Terraform plan command.” Available at: [Terraform plan documentation](https://developer.hashicorp.com/terraform/cli/commands/plan)
-12. HashiCorp, “Terraform show command.” Available at: [Terraform show documentation](https://developer.hashicorp.com/terraform/cli/commands/show)
-13. HashiCorp, “Terraform fmt command.” Available at: [Terraform fmt documentation](https://developer.hashicorp.com/terraform/cli/commands/fmt)
-14. HashiCorp, “Terraform init command.” Available at: [Terraform init documentation](https://developer.hashicorp.com/terraform/cli/commands/init)
-15. HashiCorp, “Terraform output command.” Available at: [Terraform output documentation](https://developer.hashicorp.com/terraform/cli/commands/output)
-16. HashiCorp, “Terraform validate command.” Available at: [Terraform validate documentation](https://developer.hashicorp.com/terraform/cli/commands/validate)
+9. HashiCorp, “Get started with Terraform and AWS.” Available at:  
+   [Terraform AWS tutorial](https://developer.hashicorp.com/terraform/tutorials/aws-get-started)
+
+10. HashiCorp, “Terraform validate command.” Available at:  
+    [Terraform validate documentation](https://developer.hashicorp.com/terraform/cli/commands/validate)
+
+11. HashiCorp, “Terraform plan command.” Available at:  
+    [Terraform plan documentation](https://developer.hashicorp.com/terraform/cli/commands/plan)
+
+12. HashiCorp, “Terraform show command.” Available at:  
+    [Terraform show documentation](https://developer.hashicorp.com/terraform/cli/commands/show)
+
+13. HashiCorp, “Terraform fmt command.” Available at:  
+    [Terraform fmt documentation](https://developer.hashicorp.com/terraform/cli/commands/fmt)
+
+14. HashiCorp, “Terraform init command.” Available at:  
+    [Terraform init documentation](https://developer.hashicorp.com/terraform/cli/commands/init)
+
+15. HashiCorp, “Terraform output command.” Available at:  
+    [Terraform output documentation](https://developer.hashicorp.com/terraform/cli/commands/output)
+
+
+16. AWS | Terraform  “Create, manage, and destroy AWS infrastructure using Terraform. Step-by-step, command-line tutorials will walk you through the Terraform basics for the first  ” Available at:  
+    [Tutorial of Terraform AWS documentation](https://developer.hashicorp.com/terraform/tutorials/aws-get-started)
