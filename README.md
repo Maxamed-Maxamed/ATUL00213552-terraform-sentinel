@@ -938,5 +938,5 @@ The project also shows the limits of Policy-as-Code. Region selection alone does
     [Terraform output documentation](https://developer.hashicorp.com/terraform/cli/commands/output)
 
 
-16. AWS | Terraform  “Create, manage, and destroy AWS infrastructure using Terraform. Step-by-step, command-line tutorials will walk you through the Terraform basics for the first  ” Available at:  
+16. AWS Terraform, “Create, manage, and destroy AWS infrastructure using Terraform. Step-by-step, command-line tutorials will walk you through the Terraform basics for the first  ” Available at:  
     [Tutorial of Terraform AWS documentation](https://developer.hashicorp.com/terraform/tutorials/aws-get-started)
