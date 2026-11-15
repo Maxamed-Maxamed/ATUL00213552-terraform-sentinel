@@ -1,0 +1,497 @@
+import "strings"
+
+providers = {
+	"aws": {
+		"alias": "",
+		"config": {
+			"default_tags": [
+				{
+					"tags": {
+						"constant_value": {
+							"DataRegion": "Ireland",
+							"ManagedBy":  "Terraform",
+							"Project":    "Terraform Digital Sovereignty",
+							"StudentID":  "ATUL00213552",
+						},
+					},
+				},
+			],
+			"region": {
+				"references": [
+					"var.aws_region",
+				],
+			},
+		},
+		"full_name":           "registry.terraform.io/hashicorp/aws",
+		"module_address":      "",
+		"name":                "aws",
+		"provider_config_key": "aws",
+		"version_constraint":  "~> 6.0",
+	},
+}
+
+resources = {
+	"aws_ebs_volume.outside_ireland": {
+		"address": "aws_ebs_volume.outside_ireland",
+		"config": {
+			"availability_zone": {
+				"constant_value": "us-east-1a",
+			},
+			"encrypted": {
+				"constant_value": false,
+			},
+			"region": {
+				"constant_value": "us-east-1",
+			},
+			"size": {
+				"constant_value": 8,
+			},
+			"tags": {
+				"constant_value": {
+					"Classification": "sensitive",
+					"Name":           "demo-non-compliant-volume",
+				},
+			},
+		},
+		"count":               {},
+		"depends_on":          [],
+		"for_each":            {},
+		"mode":                "managed",
+		"module_address":      "",
+		"name":                "outside_ireland",
+		"provider_config_key": "aws",
+		"provisioners":        [],
+		"type":                "aws_ebs_volume",
+	},
+	"aws_instance.compliant": {
+		"address": "aws_instance.compliant",
+		"config": {
+			"ami": {
+				"references": [
+					"data.aws_ami.amazon_linux.id",
+					"data.aws_ami.amazon_linux",
+				],
+			},
+			"associate_public_ip_address": {
+				"constant_value": false,
+			},
+			"instance_type": {
+				"references": [
+					"var.instance_type",
+				],
+			},
+			"metadata_options": [
+				{
+					"http_endpoint": {
+						"constant_value": "enabled",
+					},
+					"http_tokens": {
+						"constant_value": "required",
+					},
+				},
+			],
+			"root_block_device": [
+				{
+					"encrypted": {
+						"constant_value": true,
+					},
+					"volume_size": {
+						"constant_value": 8,
+					},
+					"volume_type": {
+						"constant_value": "gp3",
+					},
+				},
+			],
+			"subnet_id": {
+				"references": [
+					"aws_subnet.public.id",
+					"aws_subnet.public",
+				],
+			},
+			"tags": {
+				"constant_value": {
+					"Classification": "sensitive",
+					"DataResidency":  "Ireland",
+					"Name":           "sovereignty-compliant-instance",
+				},
+			},
+			"vpc_security_group_ids": {
+				"references": [
+					"aws_security_group.instance.id",
+					"aws_security_group.instance",
+				],
+			},
+		},
+		"count":               {},
+		"depends_on":          [],
+		"for_each":            {},
+		"mode":                "managed",
+		"module_address":      "",
+		"name":                "compliant",
+		"provider_config_key": "aws",
+		"provisioners":        [],
+		"type":                "aws_instance",
+	},
+	"aws_instance.non_compliant": {
+		"address": "aws_instance.non_compliant",
+		"config": {
+			"ami": {
+				"references": [
+					"data.aws_ami.amazon_linux.id",
+					"data.aws_ami.amazon_linux",
+				],
+			},
+			"instance_type": {
+				"constant_value": "m5.large",
+			},
+			"metadata_options": [
+				{
+					"http_endpoint": {
+						"constant_value": "enabled",
+					},
+					"http_tokens": {
+						"constant_value": "optional",
+					},
+				},
+			],
+			"root_block_device": [
+				{
+					"encrypted": {
+						"constant_value": false,
+					},
+				},
+			],
+			"subnet_id": {
+				"references": [
+					"aws_subnet.public.id",
+					"aws_subnet.public",
+				],
+			},
+		},
+		"count":               {},
+		"depends_on":          [],
+		"for_each":            {},
+		"mode":                "managed",
+		"module_address":      "",
+		"name":                "non_compliant",
+		"provider_config_key": "aws",
+		"provisioners":        [],
+		"type":                "aws_instance",
+	},
+	"aws_internet_gateway.main": {
+		"address": "aws_internet_gateway.main",
+		"config": {
+			"tags": {
+				"constant_value": {
+					"Name": "sovereignty-internet-gateway",
+				},
+			},
+			"vpc_id": {
+				"references": [
+					"aws_vpc.main.id",
+					"aws_vpc.main",
+				],
+			},
+		},
+		"count":               {},
+		"depends_on":          [],
+		"for_each":            {},
+		"mode":                "managed",
+		"module_address":      "",
+		"name":                "main",
+		"provider_config_key": "aws",
+		"provisioners":        [],
+		"type":                "aws_internet_gateway",
+	},
+	"aws_route_table.public": {
+		"address": "aws_route_table.public",
+		"config": {
+			"route": {
+				"references": [
+					"aws_internet_gateway.main.id",
+					"aws_internet_gateway.main",
+				],
+			},
+			"tags": {
+				"constant_value": {
+					"Name": "sovereignty-public-route-table",
+				},
+			},
+			"vpc_id": {
+				"references": [
+					"aws_vpc.main.id",
+					"aws_vpc.main",
+				],
+			},
+		},
+		"count":               {},
+		"depends_on":          [],
+		"for_each":            {},
+		"mode":                "managed",
+		"module_address":      "",
+		"name":                "public",
+		"provider_config_key": "aws",
+		"provisioners":        [],
+		"type":                "aws_route_table",
+	},
+	"aws_route_table_association.public": {
+		"address": "aws_route_table_association.public",
+		"config": {
+			"route_table_id": {
+				"references": [
+					"aws_route_table.public.id",
+					"aws_route_table.public",
+				],
+			},
+			"subnet_id": {
+				"references": [
+					"aws_subnet.public.id",
+					"aws_subnet.public",
+				],
+			},
+		},
+		"count":               {},
+		"depends_on":          [],
+		"for_each":            {},
+		"mode":                "managed",
+		"module_address":      "",
+		"name":                "public",
+		"provider_config_key": "aws",
+		"provisioners":        [],
+		"type":                "aws_route_table_association",
+	},
+	"aws_security_group.instance": {
+		"address": "aws_security_group.instance",
+		"config": {
+			"description": {
+				"constant_value": "No unrestricted inbound access is permitted",
+			},
+			"egress": {
+				"constant_value": [
+					{
+						"cidr_blocks": [
+							"0.0.0.0/0",
+						],
+						"description":      "Allow outbound HTTPS",
+						"from_port":        443,
+						"ipv6_cidr_blocks": null,
+						"prefix_list_ids":  null,
+						"protocol":         "tcp",
+						"security_groups":  null,
+						"self":             null,
+						"to_port":          443,
+					},
+				],
+			},
+			"name": {
+				"constant_value": "sovereignty-instance-security-group",
+			},
+			"tags": {
+				"constant_value": {
+					"Name": "sovereignty-instance-security-group",
+				},
+			},
+			"vpc_id": {
+				"references": [
+					"aws_vpc.main.id",
+					"aws_vpc.main",
+				],
+			},
+		},
+		"count":               {},
+		"depends_on":          [],
+		"for_each":            {},
+		"mode":                "managed",
+		"module_address":      "",
+		"name":                "instance",
+		"provider_config_key": "aws",
+		"provisioners":        [],
+		"type":                "aws_security_group",
+	},
+	"aws_subnet.public": {
+		"address": "aws_subnet.public",
+		"config": {
+			"availability_zone": {
+				"references": [
+					"var.aws_region",
+				],
+			},
+			"cidr_block": {
+				"constant_value": "10.0.1.0/24",
+			},
+			"map_public_ip_on_launch": {
+				"constant_value": false,
+			},
+			"tags": {
+				"constant_value": {
+					"Environment": "assignment",
+					"Name":        "sovereignty-public-subnet",
+				},
+			},
+			"vpc_id": {
+				"references": [
+					"aws_vpc.main.id",
+					"aws_vpc.main",
+				],
+			},
+		},
+		"count":               {},
+		"depends_on":          [],
+		"for_each":            {},
+		"mode":                "managed",
+		"module_address":      "",
+		"name":                "public",
+		"provider_config_key": "aws",
+		"provisioners":        [],
+		"type":                "aws_subnet",
+	},
+	"aws_vpc.main": {
+		"address": "aws_vpc.main",
+		"config": {
+			"cidr_block": {
+				"constant_value": "10.0.0.0/16",
+			},
+			"enable_dns_hostnames": {
+				"constant_value": true,
+			},
+			"enable_dns_support": {
+				"constant_value": true,
+			},
+			"tags": {
+				"constant_value": {
+					"Environment": "assignment",
+					"Name":        "sovereignty-vpc",
+				},
+			},
+		},
+		"count":               {},
+		"depends_on":          [],
+		"for_each":            {},
+		"mode":                "managed",
+		"module_address":      "",
+		"name":                "main",
+		"provider_config_key": "aws",
+		"provisioners":        [],
+		"type":                "aws_vpc",
+	},
+	"aws_vpc_security_group_ingress_rule.ssh_from_anywhere": {
+		"address": "aws_vpc_security_group_ingress_rule.ssh_from_anywhere",
+		"config": {
+			"cidr_ipv4": {
+				"constant_value": "0.0.0.0/0",
+			},
+			"description": {
+				"constant_value": "Demo only: unrestricted SSH",
+			},
+			"from_port": {
+				"constant_value": 22,
+			},
+			"ip_protocol": {
+				"constant_value": "tcp",
+			},
+			"security_group_id": {
+				"references": [
+					"aws_security_group.instance.id",
+					"aws_security_group.instance",
+				],
+			},
+			"to_port": {
+				"constant_value": 22,
+			},
+		},
+		"count":               {},
+		"depends_on":          [],
+		"for_each":            {},
+		"mode":                "managed",
+		"module_address":      "",
+		"name":                "ssh_from_anywhere",
+		"provider_config_key": "aws",
+		"provisioners":        [],
+		"type":                "aws_vpc_security_group_ingress_rule",
+	},
+	"data.aws_ami.amazon_linux": {
+		"address": "data.aws_ami.amazon_linux",
+		"config": {
+			"filter": [
+				{
+					"name": {
+						"constant_value": "name",
+					},
+					"values": {
+						"constant_value": [
+							"al2023-ami-2023.*-x86_64",
+						],
+					},
+				},
+				{
+					"name": {
+						"constant_value": "architecture",
+					},
+					"values": {
+						"constant_value": [
+							"x86_64",
+						],
+					},
+				},
+				{
+					"name": {
+						"constant_value": "virtualization-type",
+					},
+					"values": {
+						"constant_value": [
+							"hvm",
+						],
+					},
+				},
+			],
+			"most_recent": {
+				"constant_value": true,
+			},
+			"owners": {
+				"constant_value": [
+					"amazon",
+				],
+			},
+		},
+		"count":               {},
+		"depends_on":          [],
+		"for_each":            {},
+		"mode":                "data",
+		"module_address":      "",
+		"name":                "amazon_linux",
+		"provider_config_key": "aws",
+		"provisioners":        [],
+		"type":                "aws_ami",
+	},
+}
+
+provisioners = {}
+
+variables = {
+	"aws_region": {
+		"default":        "eu-west-1",
+		"description":    "Approved AWS region for Irish data residency",
+		"module_address": "",
+		"name":           "aws_region",
+	},
+	"instance_type": {
+		"default":        "t3.micro",
+		"description":    "Approved EC2 instance type",
+		"module_address": "",
+		"name":           "instance_type",
+	},
+}
+
+outputs = {}
+
+module_calls = {}
+
+strip_index = func(addr) {
+	s = strings.split(addr, ".")
+	for s as i, v {
+		s[i] = strings.split(v, "[")[0]
+	}
+
+	return strings.join(s, ".")
+}
