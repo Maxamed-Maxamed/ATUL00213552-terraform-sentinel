@@ -1,0 +1,44 @@
+import "tfplan/v2" as tfplan
+
+# EC2 instance types approved for this project.
+approved_instance_types = [
+	"t3.micro",
+	"t3.small",
+]
+
+# EC2 instances that will exist after the run.
+ec2_instances = filter tfplan.resource_changes as _, rc {
+	rc.type is "aws_instance" and
+		rc.mode is "managed" and
+		rc.change.after is not null
+}
+
+# In real plan data metadata_options is a list with one block,
+# so the value is read from the first item.
+# A missing block returns false because AWS could then allow IMDSv1.
+requires_imdsv2 = func(instance) {
+	options = instance.change.after.metadata_options else []
+	if options is null or length(options) is 0 {
+		return false
+	}
+	return (options[0].http_tokens else "") is "required"
+}
+
+# Rule 1: only approved instance types.
+instance_types_approved = rule {
+	all ec2_instances as _, instance {
+		(instance.change.after.instance_type else "") in approved_instance_types
+	}
+}
+
+# Rule 2: IMDSv2 is mandatory.
+instances_require_imdsv2 = rule {
+	all ec2_instances as _, instance {
+		requires_imdsv2(instance)
+	}
+}
+
+main = rule {
+	instance_types_approved and
+		instances_require_imdsv2
+}

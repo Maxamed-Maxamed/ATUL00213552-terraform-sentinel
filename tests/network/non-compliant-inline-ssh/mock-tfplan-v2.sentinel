@@ -1,0 +1,33 @@
+resource_changes = {
+	"aws_security_group.open_ssh": {
+		"address": "aws_security_group.open_ssh",
+		"mode": "managed",
+		"type": "aws_security_group",
+		"name": "open_ssh",
+		"provider_name": "registry.terraform.io/hashicorp/aws",
+		"change": {
+			"actions": [
+				"create",
+			],
+			"after": {
+				"name": "open-ssh",
+				"region": "eu-west-1",
+				"ingress": [
+					{
+						"cidr_blocks": [
+							"0.0.0.0/0",
+						],
+						"ipv6_cidr_blocks": [],
+						"description": "SSH from anywhere",
+						"from_port": 22,
+						"to_port": 22,
+						"protocol": "tcp",
+						"prefix_list_ids": [],
+						"security_groups": [],
+						"self": false,
+					},
+				],
+			},
+		},
+	},
+}

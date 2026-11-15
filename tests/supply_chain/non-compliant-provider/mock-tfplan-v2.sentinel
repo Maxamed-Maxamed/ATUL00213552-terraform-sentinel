@@ -1,0 +1,18 @@
+resource_changes = {
+	"aws_vpc.main": {
+		"address": "aws_vpc.main",
+		"mode": "managed",
+		"type": "aws_vpc",
+		"name": "main",
+		"provider_name": "registry.terraform.io/untrusted/aws",
+		"change": {
+			"actions": [
+				"create",
+			],
+			"after": {
+				"cidr_block": "10.0.0.0/16",
+				"region": "eu-west-1",
+			},
+		},
+	},
+}

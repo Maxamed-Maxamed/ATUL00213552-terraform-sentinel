@@ -1,19 +1,60 @@
 import "tfplan/v2" as tfplan
 
-# Find EBS volumes that are being created or updated.
-ebs_volumes = filter tfplan.resource_changes as _, resource {
-	resource.type is "aws_ebs_volume" and
-		resource.mode is "managed" and
-		resource.change.actions not contains "delete"
+# Resources that will exist after the run.
+managed_resources = filter tfplan.resource_changes as _, rc {
+	rc.mode is "managed" and
+		rc.change.after is not null
 }
 
-# Every EBS volume must have encryption enabled.
-all_ebs_volumes_encrypted = rule {
+ebs_volumes = filter managed_resources as _, rc {
+	rc.type is "aws_ebs_volume"
+}
+
+ec2_instances = filter managed_resources as _, rc {
+	rc.type is "aws_instance"
+}
+
+# Turn a missing or null block list into an empty list.
+block_list = func(value) {
+	if value is null {
+		return []
+	}
+	return value
+}
+
+# True when every device in the list has encrypted = true.
+all_devices_encrypted = func(devices) {
+	return all devices as _, device {
+		(device.encrypted else false) is true
+	}
+}
+
+# Rule 1: standalone EBS volumes must be encrypted.
+ebs_volumes_encrypted = rule {
 	all ebs_volumes as _, volume {
-		volume.change.after.encrypted is true
+		(volume.change.after.encrypted else false) is true
+	}
+}
+
+# Rule 2: every instance must declare a root volume and encrypt it.
+# If root_block_device is left out, the disk copies the AMI snapshot,
+# and the Amazon Linux AMI snapshot is not encrypted.
+root_volumes_encrypted = rule {
+	all ec2_instances as _, instance {
+		length(block_list(instance.change.after.root_block_device else [])) > 0 and
+			all_devices_encrypted(block_list(instance.change.after.root_block_device else []))
+	}
+}
+
+# Rule 3: extra disks declared inside the instance must be encrypted.
+extra_volumes_encrypted = rule {
+	all ec2_instances as _, instance {
+		all_devices_encrypted(block_list(instance.change.after.ebs_block_device else []))
 	}
 }
 
 main = rule {
-	all_ebs_volumes_encrypted
+	ebs_volumes_encrypted and
+		root_volumes_encrypted and
+		extra_volumes_encrypted
 }

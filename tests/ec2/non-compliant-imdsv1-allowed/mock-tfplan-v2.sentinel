@@ -1,0 +1,35 @@
+resource_changes = {
+	"aws_instance.imdsv1": {
+		"address": "aws_instance.imdsv1",
+		"mode": "managed",
+		"type": "aws_instance",
+		"name": "imdsv1",
+		"provider_name": "registry.terraform.io/hashicorp/aws",
+		"change": {
+			"actions": [
+				"create",
+			],
+			"after": {
+				"instance_type": "t3.micro",
+				"region": "eu-west-1",
+				"metadata_options": [
+					{
+						"http_endpoint": "enabled",
+						"http_tokens": "optional",
+					},
+				],
+				"root_block_device": [
+					{
+						"encrypted": true,
+						"volume_size": 8,
+						"volume_type": "gp3",
+					},
+				],
+				"tags_all": {
+					"Classification": "sensitive",
+					"DataResidency": "Ireland",
+				},
+			},
+		},
+	},
+}
