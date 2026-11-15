@@ -1,0 +1,22 @@
+resource_changes = {
+	"aws_vpc_security_group_ingress_rule.ssh_ipv6": {
+		"address": "aws_vpc_security_group_ingress_rule.ssh_ipv6",
+		"mode": "managed",
+		"type": "aws_vpc_security_group_ingress_rule",
+		"name": "ssh_ipv6",
+		"provider_name": "registry.terraform.io/hashicorp/aws",
+		"change": {
+			"actions": [
+				"create",
+			],
+			"after": {
+				"ip_protocol": "tcp",
+				"from_port": 22,
+				"to_port": 22,
+				"cidr_ipv4": null,
+				"cidr_ipv6": "::/0",
+				"region": "eu-west-1",
+			},
+		},
+	},
+}

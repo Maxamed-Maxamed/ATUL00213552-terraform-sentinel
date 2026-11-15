@@ -1,0 +1,22 @@
+resource_changes = {
+	"aws_vpc_security_group_ingress_rule.all_traffic": {
+		"address": "aws_vpc_security_group_ingress_rule.all_traffic",
+		"mode": "managed",
+		"type": "aws_vpc_security_group_ingress_rule",
+		"name": "all_traffic",
+		"provider_name": "registry.terraform.io/hashicorp/aws",
+		"change": {
+			"actions": [
+				"create",
+			],
+			"after": {
+				"ip_protocol": "-1",
+				"from_port": null,
+				"to_port": null,
+				"cidr_ipv4": "0.0.0.0/0",
+				"cidr_ipv6": null,
+				"region": "eu-west-1",
+			},
+		},
+	},
+}

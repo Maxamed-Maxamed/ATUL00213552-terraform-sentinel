@@ -1,15 +1,72 @@
 import "tfplan/v2" as tfplan
 
-# AWS Europe (Ireland) is the approved region for this project.
+# AWS Europe (Ireland) is the only approved region.
 approved_regions = [
 	"eu-west-1",
 ]
 
-# Require the Terraform aws_region variable to use an approved region.
-deployment_region_is_approved = rule {
-	tfplan.variables.aws_region.value in approved_regions
+# Global services have no region attribute. None are approved yet, so any
+# resource without a region fails until its type is added here on purpose.
+approved_global_types = []
+
+# Resource types that copy or replicate data to another location.
+# They are blocked because a copy can leave Ireland even when the
+# original resource is in eu-west-1.
+replication_types = [
+	"aws_s3_bucket_replication_configuration",
+	"aws_ebs_snapshot_copy",
+	"aws_ami_copy",
+	"aws_db_instance_automated_backups_replication",
+	"aws_dynamodb_global_table",
+	"aws_dynamodb_table_replica",
+]
+
+# Every managed resource that will exist after the run.
+# Checking "after is not null" also covers resources being replaced.
+managed_resources = filter tfplan.resource_changes as _, rc {
+	rc.mode is "managed" and
+		rc.change.after is not null
+}
+
+# Read one tag from a resource. Returns "" when the tag is missing.
+tag_value = func(rc, key) {
+	tags = rc.change.after.tags_all else {}
+	if tags is null {
+		return ""
+	}
+	return tags[key] else ""
+}
+
+# Rule 1: every resource is in an approved region.
+# AWS provider 6 gives each regional resource its own region attribute,
+# so this checks the resource itself and not only the aws_region variable.
+resources_in_approved_regions = rule {
+	all managed_resources as _, rc {
+		rc.type in approved_global_types or
+			(rc.change.after.region else "unknown") in approved_regions
+	}
+}
+
+# Rule 2: resources classified as sensitive must declare Irish data residency.
+sensitive_resources = filter managed_resources as _, rc {
+	tag_value(rc, "Classification") is "sensitive"
+}
+
+sensitive_data_stays_in_ireland = rule {
+	all sensitive_resources as _, rc {
+		tag_value(rc, "DataResidency") is "Ireland"
+	}
+}
+
+# Rule 3: no cross-region replication or backup copy resources.
+no_replication_resources = rule {
+	all managed_resources as _, rc {
+		rc.type not in replication_types
+	}
 }
 
 main = rule {
-	deployment_region_is_approved
+	resources_in_approved_regions and
+		sensitive_data_stays_in_ireland and
+		no_replication_resources
 }

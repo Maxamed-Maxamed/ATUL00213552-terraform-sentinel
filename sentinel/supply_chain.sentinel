@@ -1,44 +1,75 @@
 import "tfconfig/v2" as tfconfig
+import "tfplan/v2" as tfplan
 import "strings"
 
-# Approved AWS provider source and version constraint.
-approved_provider_source = "registry.terraform.io/hashicorp/aws"
-approved_provider_version = "~> 6.0"
+# Providers that may be used, written as full registry addresses.
+approved_providers = [
+	"registry.terraform.io/hashicorp/aws",
+]
 
-# Trusted Terraform Registry module namespace.
-approved_module_prefix = "terraform-aws-modules/"
+# Version constraints that may be declared for those providers.
+approved_provider_constraints = [
+	"~> 6.0",
+]
 
-# Every provider must come from the approved source.
-providers_use_approved_source = rule {
+# Registry namespaces trusted for external modules.
+trusted_module_prefixes = [
+	"terraform-aws-modules/",
+]
+
+# Local modules live in this repository and are reviewed with it.
+is_local_module = func(source) {
+	return strings.has_prefix(source, "./") or strings.has_prefix(source, "../")
+}
+
+is_trusted_module = func(source) {
+	return any trusted_module_prefixes as _, prefix {
+		strings.has_prefix(source, prefix)
+	}
+}
+
+# Rule 1: every configured provider comes from an approved source.
+providers_from_approved_sources = rule {
 	all tfconfig.providers as _, provider {
-		provider.full_name is approved_provider_source
+		provider.full_name in approved_providers
 	}
 }
 
-# Every provider must use the approved version constraint.
-providers_use_approved_version = rule {
+# Rule 2: every configured provider declares an approved version constraint.
+providers_use_approved_versions = rule {
 	all tfconfig.providers as _, provider {
-		provider.version_constraint is approved_provider_version
+		provider.version_constraint in approved_provider_constraints
 	}
 }
 
-# Every declared module must come from the trusted namespace.
-modules_use_trusted_sources = rule {
-	all tfconfig.module_calls as _, module {
-		strings.has_prefix(module.source, approved_module_prefix)
+# Rule 3: every resource in the plan is created by an approved provider.
+# This catches a provider that is used without its own provider block.
+resources_use_approved_providers = rule {
+	all tfplan.resource_changes as _, rc {
+		rc.provider_name in approved_providers
 	}
 }
 
-# Every declared module must include a version constraint.
-modules_have_pinned_versions = rule {
+# Rule 4: external modules come from a trusted namespace.
+modules_from_trusted_sources = rule {
 	all tfconfig.module_calls as _, module {
-		module.version_constraint is not ""
+		is_local_module(module.source) or is_trusted_module(module.source)
+	}
+}
+
+# Rule 5: external modules are pinned to one exact version such as 6.0.1.
+# A range such as ">= 5.0" is rejected because it can change between runs.
+modules_pinned_to_exact_version = rule {
+	all tfconfig.module_calls as _, module {
+		is_local_module(module.source) or
+			module.version_constraint matches "^[0-9]+[.][0-9]+[.][0-9]+$"
 	}
 }
 
 main = rule {
-	providers_use_approved_source and
-	providers_use_approved_version and
-	modules_use_trusted_sources and
-	modules_have_pinned_versions
+	providers_from_approved_sources and
+		providers_use_approved_versions and
+		resources_use_approved_providers and
+		modules_from_trusted_sources and
+		modules_pinned_to_exact_version
 }

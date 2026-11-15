@@ -1,0 +1,20 @@
+resource_changes = {
+	"aws_ebs_snapshot_copy.offsite": {
+		"address": "aws_ebs_snapshot_copy.offsite",
+		"mode": "managed",
+		"type": "aws_ebs_snapshot_copy",
+		"name": "offsite",
+		"provider_name": "registry.terraform.io/hashicorp/aws",
+		"change": {
+			"actions": [
+				"create",
+			],
+			"after": {
+				"source_region": "eu-west-1",
+				"source_snapshot_id": "snap-0123456789abcdef0",
+				"region": "eu-west-1",
+				"encrypted": true,
+			},
+		},
+	},
+}

@@ -1,0 +1,5 @@
+# Example values. Copy this file to terraform.tfvars to override the defaults.
+# Both variables have validation rules, so other values are rejected by Terraform.
+
+aws_region    = "eu-west-1"
+instance_type = "t3.micro"

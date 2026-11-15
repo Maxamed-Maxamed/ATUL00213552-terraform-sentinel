@@ -1,0 +1,35 @@
+resource_changes = {
+	"aws_instance.outside_ireland": {
+		"address": "aws_instance.outside_ireland",
+		"mode": "managed",
+		"type": "aws_instance",
+		"name": "outside_ireland",
+		"provider_name": "registry.terraform.io/hashicorp/aws",
+		"change": {
+			"actions": [
+				"create",
+			],
+			"after": {
+				"instance_type": "t3.micro",
+				"region": "us-east-1",
+				"metadata_options": [
+					{
+						"http_endpoint": "enabled",
+						"http_tokens": "required",
+					},
+				],
+				"root_block_device": [
+					{
+						"encrypted": true,
+						"volume_size": 8,
+						"volume_type": "gp3",
+					},
+				],
+				"tags_all": {
+					"Classification": "sensitive",
+					"DataResidency": "Ireland",
+				},
+			},
+		},
+	},
+}

@@ -14,6 +14,8 @@ crash.log
 crash.*.log
 
 # Terraform plan files
+# terraform/tfplan is committed on purpose as assignment evidence.
+# Other saved plans stay out of version control.
 *.tfplan
 
 # Local override files
@@ -24,6 +26,10 @@ override.tf.json
 
 # Environment and editor files
 .env
+
+# Credential downloads and archives
+*.csv
+*.tar.gz
 .vscode/
 # Sentinel local cache
 .sentinel/

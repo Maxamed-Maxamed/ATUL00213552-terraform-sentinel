@@ -1,22 +1,107 @@
 import "tfplan/v2" as tfplan
 
-# Find security group ingress rules being created or updated.
-ingress_rules = filter tfplan.resource_changes as _, resource {
-	resource.type is "aws_vpc_security_group_ingress_rule" and
-		resource.mode is "managed" and
-		resource.change.actions not contains "delete"
+# Sources that mean "the whole internet" for IPv4 and IPv6.
+open_ranges = [
+	"0.0.0.0/0",
+	"::/0",
+]
+
+# Resources that will exist after the run.
+managed_resources = filter tfplan.resource_changes as _, rc {
+	rc.mode is "managed" and
+		rc.change.after is not null
 }
 
-# Reject TCP port 22 when it is accessible from the entire internet.
-no_unrestricted_ssh = rule {
-	all ingress_rules as _, ingress {
-		ingress.change.after.ip_protocol is not "tcp" or
-			ingress.change.after.from_port > 22 or
-			ingress.change.after.to_port < 22 or
-			ingress.change.after.cidr_ipv4 is not "0.0.0.0/0"
+# The AWS provider has three ways to write an inbound rule.
+# All three are checked so the policy cannot be bypassed by switching style.
+security_groups = filter managed_resources as _, rc {
+	rc.type is "aws_security_group"
+}
+
+legacy_rules = filter managed_resources as _, rc {
+	rc.type is "aws_security_group_rule" and
+		(rc.change.after.type else "") is "ingress"
+}
+
+ingress_rules = filter managed_resources as _, rc {
+	rc.type is "aws_vpc_security_group_ingress_rule"
+}
+
+# Turn a missing or null list into an empty list.
+list_or_empty = func(value) {
+	if value is null {
+		return []
+	}
+	return value
+}
+
+# True when a list of CIDR ranges contains an open range.
+has_open_range = func(cidrs) {
+	return any cidrs as _, cidr {
+		cidr in open_ranges
+	}
+}
+
+# True when the protocol and port range include SSH on TCP port 22.
+# Protocol "-1" means all protocols and all ports, so it includes SSH.
+# Unknown values count as SSH so the policy fails safe.
+covers_ssh = func(protocol, from_port, to_port) {
+	if protocol is null {
+		return true
+	}
+	if protocol in ["-1", "all"] {
+		return true
+	}
+	if protocol not in ["tcp", "6"] {
+		return false
+	}
+	if from_port is null or to_port is null {
+		return true
+	}
+	return from_port <= 22 and to_port >= 22
+}
+
+# Inline ingress blocks and aws_security_group_rule share the same fields.
+classic_rule_is_safe = func(r) {
+	exposed = has_open_range(list_or_empty(r.cidr_blocks else [])) or
+		has_open_range(list_or_empty(r.ipv6_cidr_blocks else []))
+	ssh = covers_ssh(r.protocol else null, r.from_port else null, r.to_port else null)
+	return not (exposed and ssh)
+}
+
+# aws_vpc_security_group_ingress_rule uses different field names.
+ingress_rule_is_safe = func(r) {
+	exposed = (r.cidr_ipv4 else null) in open_ranges or
+		(r.cidr_ipv6 else null) in open_ranges
+	ssh = covers_ssh(r.ip_protocol else null, r.from_port else null, r.to_port else null)
+	return not (exposed and ssh)
+}
+
+# Rule 1: inline ingress blocks inside aws_security_group.
+no_open_ssh_inline = rule {
+	all security_groups as _, sg {
+		all list_or_empty(sg.change.after.ingress else []) as _, r {
+			classic_rule_is_safe(r)
+		}
+	}
+}
+
+# Rule 2: aws_security_group_rule resources.
+no_open_ssh_legacy_rules = rule {
+	all legacy_rules as _, rc {
+		classic_rule_is_safe(rc.change.after)
+	}
+}
+
+# Rule 3: aws_vpc_security_group_ingress_rule resources.
+no_open_ssh_ingress_rules = rule {
+	all ingress_rules as _, rc {
+		ingress_rule_is_safe(rc.change.after)
 	}
 }
 
 main = rule {
-	no_unrestricted_ssh
+	no_open_ssh_inline and
+		no_open_ssh_legacy_rules and
+		no_open_ssh_ingress_rules
 }
